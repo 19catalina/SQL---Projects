@@ -1,0 +1,22 @@
+WITH session_data AS (
+  SELECT
+    user_pseudo_id,
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS session_id,
+    MAX(CASE WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'session_engaged') = 1 THEN 1 ELSE 0 END) AS session_engaged,
+    SUM(CASE WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'engagement_time_msec') IS NOT NULL THEN (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'engagement_time_msec') ELSE 0 END) AS total_engagement_time_msec,
+    MAX(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END) AS purchase_occurred
+  FROM
+    `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE
+    _TABLE_SUFFIX BETWEEN '20200101' AND '20201231'
+  GROUP BY
+    user_pseudo_id,
+    session_id
+)
+
+SELECT
+  CORR(session_engaged, purchase_occurred) AS correlation_engaged_vs_purchase,  
+  CORR(total_engagement_time_msec, purchase_occurred) AS correlation_engagement_time_vs_purchase 
+FROM
+  session_data;
+
